@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+build/
+dist/
+.coverage
+.pytest_cache/
+
+# Virtual environments
+.env
+.venv
+venv/
+env/
+
+# AWS SAM
+.aws-sam/
+samconfig.toml
+
+# Environment files
+.env.*
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db 

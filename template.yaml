@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Condor Todo API - A serverless todo application with authentication'
+
+Parameters:
+  AuthToken:
+    Type: String
+    Default: "condor-secure-default-token-change-me"
+    Description: "Secure token for API authentication"
+    NoEcho: true
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        LOG_LEVEL: INFO
+  Api:
+    Auth:
+      DefaultAuthorizer: LambdaTokenAuthorizer
+      AddDefaultAuthorizerToCorsPreflight: false
+      Authorizers:
+        LambdaTokenAuthorizer:
+          FunctionArn: !GetAtt CondorAuthFunction.Arn
+          Identity:
+            Header: Authorization
+    Cors:
+      AllowMethods: "'POST,OPTIONS'"
+      AllowHeaders: "'Content-Type,Authorization'"
+      AllowOrigin: "'*'"
+
+Resources:
+  CondorAuthFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: condor-auth-function-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  CondorTodoFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: condor-todo-function-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource: !GetAtt CondorTodoTable.Arn
+
+  CondorAuthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: condor-auth-function
+      CodeUri: .
+      Handler: src.handlers.auth.lambda_handler
+      Role: !GetAtt CondorAuthFunctionRole.Arn
+      Environment:
+        Variables:
+          AUTH_TOKEN: !Ref AuthToken
+
+  CondorTodoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: condor-todo-function
+      CodeUri: .
+      Handler: src.handlers.todo.lambda_handler
+      Role: !GetAtt CondorTodoFunctionRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref CondorTodoTable
+      Events:
+        CreateTodo:
+          Type: Api
+          Properties:
+            Path: /todo
+            Method: post
+            Auth:
+              Authorizer: LambdaTokenAuthorizer
+
+  CondorTodoTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: condor-todo-table
+      PrimaryKey:
+        Name: id
+        Type: String
+
+Outputs:
+  TodoApiUrl:
+    Description: "API Gateway endpoint URL for Todo API"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/todo/"
+    Export:
+      Name: !Sub "${AWS::StackName}-TodoApiUrl"
+  
+  TodoTableName:
+    Description: "DynamoDB table name for todos"
+    Value: !Ref CondorTodoTable
+    Export:
+      Name: !Sub "${AWS::StackName}-TodoTableName"
