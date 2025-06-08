@@ -5,7 +5,7 @@ A serverless todo application built with AWS SAM, Python, and DynamoDB, featurin
 ## 🚀 Features
 
 - **RESTful API** for todo management (create action only)
-- **Token-based authentication** using Lambda authorizers (simple authentication with saved auth token in environment variables, suitable for server-to-server communication)
+- **Token-based authentication** using Lambda authorizers (simple authentication with saved auth token in SSM Parameter Store, suitable for server-to-server communication)
 - **Data validation** with Pydantic models
 - **Structured logging** for monitoring
 - **Error handling** with standardized responses
