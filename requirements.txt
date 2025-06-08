@@ -6,4 +6,3 @@ boto3>=1.38.0,<2.0.0
 # pytest>=7.0.0              # Testing framework
 # pytest-mock>=3.10.0        # Mocking for tests
 # black>=23.0.0              # Code formatting
-# mypy>=1.0.0                # Type checking

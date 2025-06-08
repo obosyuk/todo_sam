@@ -9,21 +9,16 @@ import logging
 import os
 from typing import Any, Dict
 
+import boto3
+from botocore.exceptions import ClientError
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+ssm_client = boto3.client("ssm")
+
 
 def create_policy(effect: str, resource: str) -> Dict[str, Any]:
-    """
-    Create an IAM policy document.
-
-    Args:
-        effect: Allow or Deny
-        resource: Resource ARN
-
-    Returns:
-        IAM policy document
-    """
     return {
         "Version": "2012-10-17",
         "Statement": [
@@ -35,21 +30,32 @@ def create_policy(effect: str, resource: str) -> Dict[str, Any]:
 def create_auth_response(
     principal_id: str, effect: str, resource: str
 ) -> Dict[str, Any]:
-    """
-    Create authorization response.
-
-    Args:
-        principal_id: Principal identifier
-        effect: Allow or Deny
-        resource: Resource ARN
-
-    Returns:
-        Authorization response dictionary
-    """
     return {
         "principalId": principal_id,
         "policyDocument": create_policy(effect, resource),
     }
+
+
+def get_auth_token_from_ssm() -> str:
+    """
+    Retrieve the auth token from SSM Parameter Store.
+
+    Returns:
+        Auth token string
+
+    Raises:
+        ValueError: If parameter name is not configured or token cannot be retrieved
+    """
+    parameter_name = os.environ.get("AUTH_TOKEN_PARAMETER_NAME")
+    if not parameter_name:
+        raise ValueError("AUTH_TOKEN_PARAMETER_NAME environment variable not set")
+
+    try:
+        response = ssm_client.get_parameter(Name=parameter_name, WithDecryption=True)
+        return response["Parameter"]["Value"]
+    except ClientError as e:
+        logger.error(f"Failed to retrieve auth token from SSM: {e}")
+        raise ValueError(f"Failed to retrieve auth token: {e}")
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -73,10 +79,11 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
         logger.info("Processing authorization request")
 
-        # Get the secure token from environment variable
-        auth_token = os.environ.get("AUTH_TOKEN")
-        if not auth_token:
-            logger.error("AUTH_TOKEN environment variable not set")
+        # Get the secure token from SSM Parameter Store
+        try:
+            auth_token = get_auth_token_from_ssm()
+        except ValueError as e:
+            logger.error(f"Failed to get auth token: {e}")
             return create_auth_response("unauthorized", "Deny", method_arn)
 
         if token == auth_token:

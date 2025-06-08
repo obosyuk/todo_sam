@@ -2,13 +2,6 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: 'Condor Todo API - A serverless todo application with authentication'
 
-Parameters:
-  AuthToken:
-    Type: String
-    Default: "condor-secure-default-token-change-me"
-    Description: "Secure token for API authentication"
-    NoEcho: true
-
 Globals:
   Function:
     Runtime: python3.13
@@ -45,6 +38,15 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: SSMParameterAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/condor-todo-app/auth-token"
 
   CondorTodoFunctionRole:
     Type: AWS::IAM::Role
@@ -67,11 +69,6 @@ Resources:
               - Effect: Allow
                 Action:
                   - dynamodb:PutItem
-                  - dynamodb:GetItem
-                  - dynamodb:UpdateItem
-                  - dynamodb:DeleteItem
-                  - dynamodb:Query
-                  - dynamodb:Scan
                 Resource: !GetAtt CondorTodoTable.Arn
 
   CondorAuthFunction:
@@ -83,7 +80,7 @@ Resources:
       Role: !GetAtt CondorAuthFunctionRole.Arn
       Environment:
         Variables:
-          AUTH_TOKEN: !Ref AuthToken
+          AUTH_TOKEN_PARAMETER_NAME: /condor-todo-app/auth-token
 
   CondorTodoFunction:
     Type: AWS::Serverless::Function

@@ -4,8 +4,8 @@ A serverless todo application built with AWS SAM, Python, and DynamoDB, featurin
 
 ## 🚀 Features
 
-- **RESTful API** for todo management
-- **Token-based authentication** using Lambda authorizers
+- **RESTful API** for todo management (create action only)
+- **Token-based authentication** using Lambda authorizers (simple authentication with saved auth token in environment variables, suitable for server-to-server communication)
 - **Data validation** with Pydantic models
 - **Structured logging** for monitoring
 - **Error handling** with standardized responses
@@ -22,14 +22,15 @@ A serverless todo application built with AWS SAM, Python, and DynamoDB, featurin
 ### Local Testing
 
 ```bash
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate
+
 # Install dependencies
 pip install -r requirements.txt
 
 # Run tests
-python -m pytest tests/
-
-# Run specific test
-python -m unittest tests.test_todo_handler.TestTodoHandler.test_create_todo_success
+pytest tests/
 ```
 
 ### Deployment
@@ -41,8 +42,12 @@ sam build
 # Deploy with guided setup
 sam deploy --guided
 
-# Deploy with custom token
-sam deploy --parameter-overrides AuthToken="your-secure-token"
+# Update the auth token in SSM Parameter Store (after deployment)
+aws ssm put-parameter \
+  --name "/condor-todo-app/auth-token" \
+  --value "your-secure-token" \
+  --type "SecureString" \
+  --overwrite
 ```
 
 ### API Usage
@@ -54,7 +59,7 @@ API_URL=$(aws cloudformation describe-stacks \
   --query 'Stacks[0].Outputs[?OutputKey==`TodoApiUrl`].OutputValue' \
   --output text)
 
-# Create a todo item
+# Create a todo item (use the token you set in SSM)
 curl -X POST "$API_URL" \
   -H "Authorization: Bearer your-secure-token" \
   -H "Content-Type: application/json" \
@@ -65,40 +70,21 @@ curl -X POST "$API_URL" \
 
 ### Environment Variables
 
-- `AUTH_TOKEN`: Authentication token for API access
+- `AUTH_TOKEN_PARAMETER_NAME`: SSM Parameter name containing the authentication token
 - `TABLE_NAME`: DynamoDB table name for todos
 - `LOG_LEVEL`: Logging level (default: INFO)
 
-### SAM Parameters
+### SSM Parameters
 
-- `AuthToken`: Secure token for API authentication (NoEcho)
+- `/condor-todo-app/auth-token`: Encrypted authentication token for API access
 
 ## 📊 Monitoring
 
-The application includes structured logging for monitoring:
-
-- Request/response logging
-- Error tracking with stack traces
-- Performance metrics via CloudWatch
+The application provides extensive logging and performance monitoring via CloudWatch (log groups and metrics)
 
 ## 🔒 Security
 
-- Token-based authentication
+- Token-based authentication with encrypted SSM parameter storage
 - IAM roles with least privilege
 - Input validation with Pydantic
 - CORS configuration
-- No hardcoded secrets
-
-## 🧪 Testing
-
-The project includes comprehensive tests:
-
-- Unit tests for handlers
-- Mocked AWS services
-- Error case coverage
-- Validation testing
-
-Run tests with:
-```bash
-python -m pytest tests/ -v
-``` 
